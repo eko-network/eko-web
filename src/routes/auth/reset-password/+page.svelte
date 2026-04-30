@@ -3,19 +3,19 @@
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { Label } from "$lib/components/ui/label/index.js";
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "$lib/components/ui/card/index.js";
-	import { ArrowLeft, Lock, Eye, EyeOff, AlertCircle } from '@lucide/svelte';
+	import { Lock, Eye, EyeOff, AlertCircle } from '@lucide/svelte';
+	import ReturnHomeWidget from '$lib/components/return-home-widget.svelte';
 	import { supabase } from '$lib/supabase.js';
     import { Toaster, toast } from 'svelte-sonner'
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import { goto } from '$app/navigation';
 
 	
 	let password = '';
 	let confirmPassword = '';
 	let showPassword = false;
-	let showConfirmPassword = false;
 	let isLoading = false;
-    let email = '';
 	let hasValidToken = false;
 	let tokenError = '';
 	let isCheckingToken = true;
@@ -24,7 +24,7 @@
 		if (!browser) return;
 		
 		try {
-			// Parse the URL hash fragment for Supabase auth tokens
+			// Parse the URL hash fragment for Supabase auth tokens (implicit flow)
 			const hashParams = new URLSearchParams(window.location.hash.substring(1));
 			const accessToken = hashParams.get('access_token');
 			const refreshToken = hashParams.get('refresh_token');
@@ -33,13 +33,13 @@
 			// Check if this is a password reset flow
 			if (type !== 'recovery' || !accessToken) {
 				hasValidToken = false;
-				tokenError = 'Invalid or missing reset token. Please request a new password reset link.';
+				tokenError = 'Invalid or missing reset token.';
 				isCheckingToken = false;
 				return;
 			}
 			
-			// Set the session using the tokens from the URL hash
-			const { data: sessionData, error } = await supabase.auth.setSession({
+			// Set the session using tokens from the URL hash
+			const { error } = await supabase.auth.setSession({
 				access_token: accessToken,
 				refresh_token: refreshToken || ''
 			});
@@ -47,7 +47,7 @@
 			if (error) {
 				console.error('Session error:', error);
 				hasValidToken = false;
-				tokenError = 'Invalid or expired reset token. Please request a new password reset link.';
+				tokenError = error.message || 'Invalid or expired reset token.';
 			} else {
 				hasValidToken = true;
 				// Clean the URL by removing the hash fragment
@@ -64,32 +64,17 @@
 		}
 	});
 	
-	function sendNewResetLink() {
-        isLoading = true;
-		supabase.auth.resetPasswordForEmail(email, { redirectTo: `https://www.eko-app.com/auth/reset-password` })
-			.then(() => {
-                toast.success('Password reset link sent to your email');
-                isLoading = false;
-			})
-			.catch((error) => {
-				console.error('Error sending password reset link:', error);
-				toast.error('Failed to send password reset link. Please try again.');
-                isLoading = false;
-			});
-	}
-	
 	function togglePasswordVisibility() {
 		showPassword = !showPassword;
+		if (showPassword) {
+			confirmPassword = '';
+		}
 	}
 	
-	function toggleConfirmPasswordVisibility() {
-		showConfirmPassword = !showConfirmPassword;
-	}
-	
-	function handleSubmit(event: Event) {
+	async function handleSubmit(event: Event) {
 		event.preventDefault();
 		
-		if (password !== confirmPassword) {
+		if (!showPassword && password !== confirmPassword) {
 			toast.error('Passwords do not match');
 			return;
 		}
@@ -101,24 +86,22 @@
 		
 		isLoading = true;
 		
-		// Update password using Supabase
-		supabase.auth.updateUser({ password })
-			.then(({ error }) => {
-				isLoading = false;
-				if (error) {
-					console.error('Password update error:', error);
-					toast.error('Failed to reset password. Please try again.');
-				} else {
-					toast.success('Password reset successfully!');
-					// Redirect to login or home page
-					window.location.href = '/';
-				}
-			})
-			.catch((err) => {
-				isLoading = false;
-				console.error('Unexpected error:', err);
-				toast.error('An unexpected error occurred. Please try again.');
-			});
+		try {
+			// Update password using Supabase
+			const { error } = await supabase.auth.updateUser({ password });
+			isLoading = false;
+			if (error) {
+				console.error('Password update error:', error);
+				toast.error(error.message ? `Failed to reset password: ${error.message}` : 'Failed to reset password.');
+				return;
+			}
+
+			await goto('/auth/reset-password/success');
+		} catch (err) {
+			isLoading = false;
+			console.error('Unexpected error:', err);
+			toast.error('An unexpected error occurred. Please try again.');
+		}
 	}
 </script>
 
@@ -186,45 +169,37 @@
 							</div>
 						</div>
 						
-						<div class="space-y-2">
-							<Label for="confirm-password" class="text-sm font-medium">Confirm Password</Label>
-							<div class="relative">
-								<Input
-									id="confirm-password"
-									type={showConfirmPassword ? "text" : "password"}
-									bind:value={confirmPassword}
-									placeholder="Confirm your new password"
-									class="pr-10"
-									required
-									minlength={8}
-								/>
-								<button
-									type="button"
-									on:click={toggleConfirmPasswordVisibility}
-									class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-								>
-									{#if showConfirmPassword}
-										<EyeOff class="w-4 h-4" />
-									{:else}
-										<Eye class="w-4 h-4" />
-									{/if}
-								</button>
+						{#if !showPassword}
+							<div class="space-y-2">
+								<Label for="confirm-password" class="text-sm font-medium">Confirm Password</Label>
+								<div class="relative">
+									<Input
+										id="confirm-password"
+										type="password"
+										bind:value={confirmPassword}
+										placeholder="Confirm your new password"
+										required
+										minlength={8}
+									/>
+								</div>
 							</div>
-						</div>
+						{/if}
 						
 						<div class="space-y-3 pt-2">
 							<div class="text-xs text-muted-foreground space-y-1">
 								<p>Password requirements:</p>
 								<ul class="list-disc list-inside space-y-0.5 ml-2">
 									<li class:text-green-600={password.length >= 8}>At least 8 characters</li>
-									<li class:text-green-600={password !== confirmPassword ? false : password.length > 0}>Passwords match</li>
+									{#if !showPassword}
+										<li class:text-green-600={password !== confirmPassword ? false : password.length > 0}>Passwords match</li>
+									{/if}
 								</ul>
 							</div>
 							
 							<Button 
 								type="submit" 
 								class="w-full" 
-								disabled={isLoading || password !== confirmPassword || password.length < 8}
+								disabled={isLoading || password.length < 8 || (!showPassword && password !== confirmPassword)}
 							>
 								{#if isLoading}
 									<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
@@ -236,15 +211,6 @@
 						</div>
 					</form>
 					
-					<div class="text-center pt-4 border-t">
-						<a 
-							href="/auth" 
-							class="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors hover:underline"
-						>
-							<ArrowLeft class="w-4 h-4" />
-							Back to Login
-						</a>
-					</div>
 				</CardContent>
 			{:else}
 				<!-- Invalid or missing token - show error screen -->
@@ -261,37 +227,7 @@
 				</CardHeader>
 				
 				<CardContent class="space-y-6 px-0 sm:px-6">
-					<div class="text-center space-y-4">
-						<p class="text-sm text-muted-foreground">
-							Please request a new password reset link to continue.
-						</p>
-						<!-- <Label for="email" class="text-sm font-medium">Email</Label> -->
-						<Input
-							id="email"
-							type="email"
-							bind:value={email}
-							placeholder="Enter your email"
-						/>  
-						<div class="space-y-3">
-							<Button 
-								class="w-full"
-								onclick={sendNewResetLink}
-                                disabled={isLoading || !email}
-							>
-								Request New Reset Link
-							</Button>
-							
-							<div class="text-center">
-								<a 
-									href="/" 
-									class="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors hover:underline"
-								>
-									<ArrowLeft class="w-4 h-4" />
-									Cancel
-								</a>
-							</div>
-						</div>
-					</div>
+					<ReturnHomeWidget />
 				</CardContent>
 			{/if}
 		</Card>
