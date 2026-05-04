@@ -10,7 +10,7 @@
 	<script>
 		document.documentElement.classList.add('dark');
 	</script>
-	<title>Eko</title>
+	<title>eko</title>
 	<meta name="description" content="Social Media for Everyone" />
 </svelte:head>
 

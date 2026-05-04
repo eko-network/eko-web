@@ -9,7 +9,9 @@
 		<div class="text-center max-w-4xl mx-auto">
 			<!-- Main Heading -->
 			<h1 class="text-4xl sm:text-6xl lg:text-7xl font-bold text-foreground mb-6 leading-tight">
-				Social Media
+        <span class="block text-9xl">eko</span>
+        <br>
+				<span class="block text-primary">Social Media</span>
 				<span class="block text-primary">for Everyone</span>
 			</h1>
 
