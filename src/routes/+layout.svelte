@@ -14,6 +14,7 @@
 	<meta name="description" content="Social Media for Everyone" />
 </svelte:head>
 
+<div class="min-h-dvh flex flex-col">
 <!-- Navigation Bar -->
 <nav
 	class="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border"
@@ -22,7 +23,7 @@
 		<div class="flex justify-between items-center h-16">
 			<!-- Logo -->
 			<div class="flex-shrink-0">
-				<a href="/" class="hover:opacity-80 transition-opacity" aria-label="Eko - Home">
+				<a href="/" class="hover:opacity-80 transition-opacity" aria-label="eko - Home">
 					<svg
 						width="80"
 						height="55"
@@ -63,4 +64,15 @@
 	</div>
 </nav>
 
-{@render children()}
+	<div class="flex-1 flex flex-col min-h-0">
+		{@render children()}
+	</div>
+
+	<footer class="shrink-0 py-3 text-center">
+		<a
+			href="/privacy-policy"
+			class="text-[11px] text-muted-foreground/80 hover:text-muted-foreground transition-colors"
+			>eko Privacy Policy</a
+		>
+	</footer>
+</div>
